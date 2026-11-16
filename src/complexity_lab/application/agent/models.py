@@ -60,6 +60,10 @@ class ScientificReport(BaseModel):
         default_factory=list,
         description="Follow-up experiments suggested by the findings",
     )
+    artifacts: list[str] = Field(
+        default_factory=list,
+        description="File paths to generated visual artifacts and figures",
+    )
 
     def to_markdown(self) -> str:
         """Render the scientific report as a publication-ready Markdown document."""
@@ -108,5 +112,13 @@ class ScientificReport(BaseModel):
         ])
         for step in self.suggested_next_steps:
             lines.append(f"- {step}")
+
+        if self.artifacts:
+            lines.extend([
+                "",
+                "## 6. Generated Visual Artifacts & Figures",
+            ])
+            for art in self.artifacts:
+                lines.append(f"- `{art}`")
 
         return "\n".join(lines)

@@ -1,6 +1,7 @@
 """Scientific tools interface providing explicit, schema-validated execution for LLMs."""
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -16,6 +17,11 @@ from complexity_lab.simulations.cellular_automaton import (
     NeighborhoodType,
 )
 from complexity_lab.simulations.interfaces import SimulationRegistry
+from complexity_lab.visualization.plots import (
+    plot_parameter_sweep,
+    plot_time_series,
+)
+from complexity_lab.visualization.renderers import render_trajectory_gif
 
 
 class BaseTool(ABC):
@@ -449,6 +455,216 @@ class DamageSpreadingTool(BaseTool):
 
 
 # ---------------------------------------------------------------------------
+# Tool 7: Render Simulation Animation (GIF)
+# ---------------------------------------------------------------------------
+
+
+class RenderAnimationInput(BaseModel):
+    rule: str = Field(default="B3/S23", description="Cellular automaton rule string")
+    pattern: str | None = Field(
+        default=None,
+        description="Preset pattern name (e.g. glider, pulsar)",
+    )
+    density: float = Field(
+        default=0.25,
+        ge=0.0,
+        le=1.0,
+        description="Random density if pattern is None",
+    )
+    seed: int = Field(default=42, description="Random seed")
+    steps: int = Field(default=40, ge=5, le=300, description="Animation frames")
+    grid_rows: int = Field(default=32, ge=8, le=128, description="Grid rows")
+    grid_cols: int = Field(default=32, ge=8, le=128, description="Grid cols")
+    boundary: str = Field(default="periodic", description="Boundary condition")
+    output_path: str = Field(default="artifacts/animation.gif", description="Output GIF path")
+    fps: int = Field(default=10, ge=1, le=30, description="Frames per second")
+
+
+class RenderAnimationTool(BaseTool):
+    """Render a cellular automaton trajectory into an animated GIF file."""
+
+    name = "render_animation"
+    description = (
+        "Execute a simulation and compile its full 2D grid trajectory into an animated GIF."
+    )
+    args_schema = RenderAnimationInput
+
+    def execute(
+        self,
+        rule: str = "B3/S23",
+        pattern: str | None = None,
+        density: float = 0.25,
+        seed: int = 42,
+        steps: int = 40,
+        grid_rows: int = 32,
+        grid_cols: int = 32,
+        boundary: str = "periodic",
+        output_path: str = "artifacts/animation.gif",
+        fps: int = 10,
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        sim = CellularAutomatonSimulation()
+        init_mode = InitMode.PATTERN if pattern else InitMode.RANDOM
+        sim.initialize(
+            seed=seed,
+            parameters={
+                "rule": rule,
+                "boundary": BoundaryCondition(boundary),
+                "init_mode": init_mode,
+                "init_density": density,
+                "init_pattern": pattern,
+                "grid_size": (grid_rows, grid_cols),
+                "steps": steps,
+            },
+        )
+        trajectory = sim.run(steps=steps)
+        saved_path = render_trajectory_gif(trajectory, output_path=Path(output_path), fps=fps)
+        return {
+            "status": "COMPLETED",
+            "artifact_type": "animation",
+            "file_path": str(saved_path),
+            "frames": len(trajectory),
+            "fps": fps,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Tool 8: Plot Simulation Dynamics (Time Series)
+# ---------------------------------------------------------------------------
+
+
+class PlotDynamicsInput(BaseModel):
+    rule: str = Field(default="B3/S23", description="CA rule string")
+    density: float = Field(default=0.25, ge=0.0, le=1.0, description="Initial density")
+    seed: int = Field(default=42, description="Random seed")
+    steps: int = Field(default=60, ge=10, le=500, description="Simulation steps")
+    grid_rows: int = Field(default=32, ge=8, le=256, description="Grid rows")
+    grid_cols: int = Field(default=32, ge=8, le=256, description="Grid cols")
+    boundary: str = Field(default="periodic", description="Boundary condition")
+    output_path: str = Field(default="artifacts/dynamics.png", description="Output figure path")
+
+
+class PlotDynamicsTool(BaseTool):
+    """Run an experiment and plot its macroscopic dynamics (density, entropy, activity)."""
+
+    name = "plot_dynamics"
+    description = (
+        "Execute a simulation run and generate a multi-panel publication plot "
+        "tracking density, spatial Shannon entropy, and activity trajectories over time."
+    )
+    args_schema = PlotDynamicsInput
+
+    def __init__(self, service: ExperimentService | None = None) -> None:
+        self._service = service or ExperimentService()
+
+    def execute(
+        self,
+        rule: str = "B3/S23",
+        density: float = 0.25,
+        seed: int = 42,
+        steps: int = 60,
+        grid_rows: int = 32,
+        grid_cols: int = 32,
+        boundary: str = "periodic",
+        output_path: str = "artifacts/dynamics.png",
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        exp = self._service.run_experiment(
+            simulation_type=SimulationType.CELLULAR_AUTOMATON,
+            parameters={
+                "rule": rule,
+                "boundary": boundary,
+                "init_mode": "random",
+                "init_density": density,
+            },
+            seed=seed,
+            steps=steps,
+            grid_size=(grid_rows, grid_cols),
+        )
+
+        if exp.status != "COMPLETED" or exp.result is None:
+            return {"error": f"Experiment failed: {exp.error_message}"}
+
+        saved_path = plot_time_series(
+            time_series=exp.result.time_series,
+            output_path=Path(output_path),
+            title=f"Macroscopic Dynamics: Rule {rule} (Seed {seed})",
+        )
+
+        return {
+            "status": "COMPLETED",
+            "artifact_type": "figure",
+            "file_path": str(saved_path),
+            "observables": exp.result.observables,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Tool 9: Plot Parameter Sweep
+# ---------------------------------------------------------------------------
+
+
+class PlotSweepInput(BaseModel):
+    parameter_name: str = Field(default="init_density", description="Parameter to sweep")
+    values: list[Any] = Field(default=[0.05, 0.15, 0.25, 0.35, 0.45], description="Values to test")
+    rule: str = Field(default="B3/S23", description="Base rule")
+    steps: int = Field(default=50, ge=10, le=200, description="Steps per run")
+    grid_rows: int = Field(default=32, ge=8, le=128, description="Grid rows")
+    grid_cols: int = Field(default=32, ge=8, le=128, description="Grid cols")
+    output_path: str = Field(default="artifacts/sweep.png", description="Output figure path")
+
+
+class PlotSweepTool(BaseTool):
+    """Execute a parameter sweep and plot the order parameter curves."""
+
+    name = "plot_sweep"
+    description = (
+        "Execute a parameter sweep and generate an order-parameter phase diagram "
+        "plotting mean density and final entropy across the parameter variation."
+    )
+    args_schema = PlotSweepInput
+
+    def __init__(self, service: ExperimentService | None = None) -> None:
+        self._sweep_runner = ParameterSweepTool(service=service)
+
+    def execute(
+        self,
+        parameter_name: str = "init_density",
+        values: list[Any] | None = None,
+        rule: str = "B3/S23",
+        steps: int = 50,
+        grid_rows: int = 32,
+        grid_cols: int = 32,
+        output_path: str = "artifacts/sweep.png",
+        **_kwargs: Any,
+    ) -> dict[str, Any]:
+        val_list = values or [0.05, 0.15, 0.25, 0.35, 0.45]
+        sweep_data = self._sweep_runner.execute(
+            parameter_name=parameter_name,
+            values=val_list,
+            base_parameters={"rule": rule},
+            steps=steps,
+            grid_rows=grid_rows,
+            grid_cols=grid_cols,
+        )
+
+        saved_path = plot_parameter_sweep(
+            sweep_results=sweep_data["sweep_results"],
+            parameter_name=parameter_name,
+            output_path=Path(output_path),
+            title=f"Phase Transition Analysis: {parameter_name} (Rule {rule})",
+        )
+
+        return {
+            "status": "COMPLETED",
+            "artifact_type": "figure",
+            "file_path": str(saved_path),
+            "values_evaluated": len(val_list),
+            "sweep_results": sweep_data["sweep_results"],
+        }
+
+
+# ---------------------------------------------------------------------------
 # Tool Registry Factory
 # ---------------------------------------------------------------------------
 
@@ -468,6 +684,9 @@ class ToolRegistry:
         self.register(CompareExperimentsTool(service=self._service))
         self.register(ParameterSweepTool(service=self._service))
         self.register(DamageSpreadingTool())
+        self.register(RenderAnimationTool())
+        self.register(PlotDynamicsTool(service=self._service))
+        self.register(PlotSweepTool(service=self._service))
 
     def register(self, tool: BaseTool) -> None:
         self._tools[tool.name] = tool

@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from complexity_lab.application.agent import ScientificAgent
+from complexity_lab.application.agent import AutonomousResearchCampaign, ScientificAgent
 from complexity_lab.application.experiment_service import ExperimentService
 from complexity_lab.domain.value_objects import SimulationType
 
@@ -52,12 +52,22 @@ def simulate(
     density: float = typer.Option(0.25, "--density", "-d", help="Random density"),
     seed: int = typer.Option(42, "--seed", help="Random seed"),
     boundary: str = typer.Option("periodic", "--boundary", "-b", help="Boundary condition"),
+    gif: Annotated[
+        Path | None,
+        typer.Option("--gif", help="Optional path to save animated GIF artifact"),
+    ] = None,
+    plot: Annotated[
+        Path | None,
+        typer.Option("--plot", help="Optional path to save dynamics plot figure"),
+    ] = None,
 ) -> None:
     """Run a deterministic simulation and print computed observables."""
     service = ExperimentService()
     console.print(
         f"[bold green]Running simulation:[/bold green] Rule={rule}, Size={rows}x{cols}, Seed={seed}"
     )
+
+    art_dir = gif.parent if gif else (plot.parent if plot else None)
 
     exp = service.run_experiment(
         simulation_type=SimulationType.CELLULAR_AUTOMATON,
@@ -70,6 +80,9 @@ def simulate(
         seed=seed,
         steps=steps,
         grid_size=(rows, cols),
+        artifacts_dir=art_dir,
+        render_gif=gif is not None,
+        render_plot=plot is not None,
     )
 
     if exp.status != "COMPLETED" or exp.result is None:
@@ -96,6 +109,11 @@ def simulate(
     table.add_row("Extinct", str(obs.get("is_extinct")))
 
     console.print(table)
+
+    if exp.artifacts:
+        console.print("\n[bold cyan]Generated Visual Artifacts:[/bold cyan]")
+        for art in exp.artifacts:
+            console.print(f"  • {art.name} ({art.artifact_type.value}): [green]{art.path}[/green]")
 
 
 @app.command()
@@ -165,6 +183,78 @@ def agent(
         console.print("[bold cyan]Recommended Follow-up Experiments:[/bold cyan]")
         for step in report.suggested_next_steps:
             console.print(f"  • {step}")
+
+
+@app.command()
+def campaign(
+    goal: Annotated[
+        str,
+        typer.Option(
+            "--goal",
+            "-g",
+            help="High-level research objective for the multi-round campaign",
+        ),
+    ] = "Investigate phase transitions and perturbation stability across boundary conditions",
+    rounds: Annotated[
+        int,
+        typer.Option(
+            "--rounds",
+            "-r",
+            help="Number of iterative research rounds to execute",
+        ),
+    ] = 2,
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Optional file path to persist the full campaign journal",
+        ),
+    ] = None,
+) -> None:
+    """Launch an Autonomous Multi-Round Research Campaign with reflective hypothesis refinement."""
+    console.print(
+        Panel(
+            f"[bold cyan]Autonomous Scientific Campaign Initiated[/bold cyan]\n"
+            f"Campaign Goal: [yellow]{goal}[/yellow]\n"
+            f"Scheduled Rounds: [magenta]{rounds}[/magenta]",
+            title="Complex Systems Research Campaign",
+            border_style="cyan",
+        )
+    )
+
+    def on_event(event: str, payload: dict[str, Any]) -> None:
+        if event == "round_started":
+            r_num = payload.get("round")
+            subgoal = payload.get("subgoal")
+            console.print(
+                f"\n[bold green]═══ Initiating Round {r_num} ═══[/bold green]\nTarget: {subgoal}"
+            )
+        elif event == "round_completed":
+            r_num = payload.get("round")
+            console.print(f"[dim]✔ Round {r_num} completed and synthesized.[/dim]")
+        elif event == "campaign_report_saved":
+            p = payload.get("path")
+            console.print(
+                f"\n[bold green]Campaign Journal persisted to:[/bold green] [cyan]{p}[/cyan]"
+            )
+
+    runner = AutonomousResearchCampaign(observer_callback=on_event)
+    camp_report = runner.execute_campaign(
+        campaign_goal=goal,
+        max_rounds=rounds,
+        output_path=output,
+    )
+
+    console.print("\n" + "=" * 60)
+    console.print(Panel(camp_report.meta_synthesis, title="Meta-Synthesis", border_style="green"))
+    console.print(
+        Panel(
+            f"[bold]{camp_report.final_conclusion}[/bold]",
+            title="Campaign Conclusion",
+            border_style="yellow",
+        )
+    )
 
 
 if __name__ == "__main__":

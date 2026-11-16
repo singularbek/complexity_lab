@@ -1,5 +1,10 @@
 """Autonomous Scientific Agent package for complex systems research."""
 
+from complexity_lab.application.agent.campaign import (
+    AutonomousResearchCampaign,
+    CampaignRound,
+    ResearchCampaignReport,
+)
 from complexity_lab.application.agent.models import (
     ExperimentFinding,
     ExperimentPlan,
@@ -20,12 +25,17 @@ from complexity_lab.application.agent.tools import (
     InspectSimulationTool,
     ListSimulationsTool,
     ParameterSweepTool,
+    PlotDynamicsTool,
+    PlotSweepTool,
+    RenderAnimationTool,
     RunExperimentTool,
     ToolRegistry,
 )
 
 __all__ = [
+    "AutonomousResearchCampaign",
     "BaseTool",
+    "CampaignRound",
     "CompareExperimentsTool",
     "DamageSpreadingTool",
     "DeterministicScientistProvider",
@@ -38,6 +48,10 @@ __all__ = [
     "ListSimulationsTool",
     "ParameterSweepTool",
     "PlannedExperiment",
+    "PlotDynamicsTool",
+    "PlotSweepTool",
+    "RenderAnimationTool",
+    "ResearchCampaignReport",
     "RunExperimentTool",
     "ScientificAgent",
     "ScientificReport",

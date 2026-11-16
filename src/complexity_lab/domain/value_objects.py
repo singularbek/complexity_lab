@@ -24,6 +24,9 @@ class ArtifactType(StrEnum):
     """Classifications of generated experiment artifacts."""
 
     IMAGE = "image"
+    ANIMATION = "animation"
+    FIGURE = "figure"
     DATA_CSV = "data_csv"
     DATA_JSON = "data_json"
+    REPORT = "report"
     LOG = "log"
