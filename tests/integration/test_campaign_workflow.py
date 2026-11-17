@@ -6,18 +6,25 @@ from typing import Any
 import pytest
 
 from complexity_lab.application.agent import AutonomousResearchCampaign, ResearchCampaignReport
+from complexity_lab.application.agent.orchestrator import ScientificAgent
 from complexity_lab.application.experiment_service import ExperimentService
 from complexity_lab.domain.value_objects import ArtifactType, SimulationType
 
 
 @pytest.mark.integration
-def test_autonomous_research_campaign_full_workflow(tmp_path: Path) -> None:
+def test_autonomous_research_campaign_full_workflow(
+    stub_provider: Any, tmp_path: Path
+) -> None:
     events: list[str] = []
 
     def observer(event: str, _payload: dict[str, Any]) -> None:
         events.append(event)
 
-    campaign_runner = AutonomousResearchCampaign(observer_callback=observer)
+    agent = ScientificAgent(
+        provider=stub_provider,  # type: ignore[arg-type]
+        observer_callback=observer,
+    )
+    campaign_runner = AutonomousResearchCampaign(agent=agent, observer_callback=observer)
     goal = "Investigate boundary effects and perturbation stability"
     journal_path = tmp_path / "campaign_journal.md"
     art_dir = tmp_path / "artifacts"
@@ -40,7 +47,6 @@ def test_autonomous_research_campaign_full_workflow(tmp_path: Path) -> None:
     assert "Round 2" in journal_text
     assert "Meta-Synthesis" in journal_text
 
-    # Verify event cycle
     assert "campaign_started" in events
     assert "round_started" in events
     assert "round_completed" in events
@@ -74,4 +80,3 @@ def test_experiment_service_visual_artifact_generation(tmp_path: Path) -> None:
     for a in exp.artifacts:
         assert a.path.exists()
         assert a.path.stat().st_size > 50
-

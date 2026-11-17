@@ -9,10 +9,7 @@ from complexity_lab.application.agent.models import (
     ExperimentPlan,
     ScientificReport,
 )
-from complexity_lab.application.agent.providers import (
-    DeterministicScientistProvider,
-    LLMProvider,
-)
+from complexity_lab.application.agent.providers import LLMProvider
 from complexity_lab.application.agent.tools import ToolRegistry
 from complexity_lab.simulations.interfaces import SimulationRegistry
 
@@ -22,11 +19,11 @@ class ScientificAgent:
 
     def __init__(
         self,
-        provider: LLMProvider | None = None,
+        provider: LLMProvider,
         tool_registry: ToolRegistry | None = None,
         observer_callback: Callable[[str, Any], None] | None = None,
     ) -> None:
-        self.provider = provider or DeterministicScientistProvider()
+        self.provider = provider
         self.tool_registry = tool_registry or ToolRegistry()
         self.observer = observer_callback or (lambda _event, _payload: None)
 

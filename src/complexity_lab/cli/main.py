@@ -1,5 +1,6 @@
 """Command Line Interface entry point for the Complex Systems Laboratory."""
 
+import os
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -8,7 +9,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from complexity_lab.application.agent import AutonomousResearchCampaign, ScientificAgent
+from complexity_lab.application.agent import (
+    AutonomousResearchCampaign,
+    ExternalAPIProvider,
+    ScientificAgent,
+)
 from complexity_lab.application.experiment_service import ExperimentService
 from complexity_lab.domain.value_objects import SimulationType
 
@@ -18,6 +23,13 @@ app = typer.Typer(
     add_completion=False,
 )
 console = Console()
+
+
+def _create_provider() -> ExternalAPIProvider:
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise typer.BadParameter("Set the OPENAI_API_KEY environment variable to use the agent.")
+    return ExternalAPIProvider(api_key=api_key)
 
 
 @app.command()
@@ -166,7 +178,7 @@ def agent(
             path = payload.get("path")
             console.print(f"[bold green]Report saved to:[/bold green] [cyan]{path}[/cyan]")
 
-    researcher = ScientificAgent(observer_callback=on_event)
+    researcher = ScientificAgent(provider=_create_provider(), observer_callback=on_event)
     report = researcher.investigate(research_goal=goal, output_path=output)
 
     console.print("\n" + "=" * 60)
@@ -239,7 +251,7 @@ def campaign(
                 f"\n[bold green]Campaign Journal persisted to:[/bold green] [cyan]{p}[/cyan]"
             )
 
-    runner = AutonomousResearchCampaign(observer_callback=on_event)
+    runner = AutonomousResearchCampaign(provider=_create_provider(), observer_callback=on_event)
     camp_report = runner.execute_campaign(
         campaign_goal=goal,
         max_rounds=rounds,

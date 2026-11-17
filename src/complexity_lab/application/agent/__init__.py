@@ -14,7 +14,6 @@ from complexity_lab.application.agent.models import (
 )
 from complexity_lab.application.agent.orchestrator import ScientificAgent
 from complexity_lab.application.agent.providers import (
-    DeterministicScientistProvider,
     ExternalAPIProvider,
     LLMProvider,
 )
@@ -38,7 +37,6 @@ __all__ = [
     "CampaignRound",
     "CompareExperimentsTool",
     "DamageSpreadingTool",
-    "DeterministicScientistProvider",
     "ExperimentFinding",
     "ExperimentPlan",
     "ExternalAPIProvider",

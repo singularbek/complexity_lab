@@ -1,7 +1,7 @@
 """Application layer exports."""
 
 from complexity_lab.application.agent import (
-    DeterministicScientistProvider,
+    ExternalAPIProvider,
     Hypothesis,
     ScientificAgent,
     ScientificReport,
@@ -10,8 +10,8 @@ from complexity_lab.application.agent import (
 from complexity_lab.application.experiment_service import ExperimentService
 
 __all__ = [
-    "DeterministicScientistProvider",
     "ExperimentService",
+    "ExternalAPIProvider",
     "Hypothesis",
     "ScientificAgent",
     "ScientificReport",

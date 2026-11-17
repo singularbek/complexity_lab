@@ -3,7 +3,7 @@
 import pytest
 
 from complexity_lab.application.agent.models import ExperimentFinding, Hypothesis, ScientificReport
-from complexity_lab.application.agent.providers import DeterministicScientistProvider
+from complexity_lab.application.agent.providers import ExternalAPIProvider
 from complexity_lab.application.agent.tools import (
     DamageSpreadingTool,
     InspectSimulationTool,
@@ -68,25 +68,12 @@ def test_run_experiment_tool() -> None:
 
 
 @pytest.mark.unit
-def test_deterministic_provider_planning_and_synthesis() -> None:
-    provider = DeterministicScientistProvider()
-    plan = provider.formulate_plan(
-        goal="Compare HighLife B36/S23 vs Conway B3/S23",
-        available_simulations=["cellular_automaton"],
-        tool_schemas=[],
-    )
-    assert isinstance(plan.hypothesis, Hypothesis)
-    assert len(plan.planned_experiments) >= 2
-
-    # Verify synthesis
-    synthesis, conclusion, next_steps = provider.synthesize(
-        goal="Compare HighLife B36/S23 vs Conway B3/S23",
-        hypothesis=plan.hypothesis,
-        findings=[],
-    )
-    assert len(synthesis) > 0
-    assert len(conclusion) > 0
-    assert len(next_steps) > 0
+def test_external_api_provider_construction() -> None:
+    """ExternalAPIProvider can be constructed; it holds the expected config."""
+    provider = ExternalAPIProvider(api_key="test-key", model="gpt-4o")
+    assert provider.model == "gpt-4o"
+    assert "openai.com" in provider.base_url
+    assert provider.api_key == "test-key"
 
 
 @pytest.mark.unit

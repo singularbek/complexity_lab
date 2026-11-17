@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from complexity_lab.application.agent.models import Hypothesis, ScientificReport
 from complexity_lab.application.agent.orchestrator import ScientificAgent
-from complexity_lab.application.agent.providers import DeterministicScientistProvider, LLMProvider
+from complexity_lab.application.agent.providers import LLMProvider
 from complexity_lab.application.agent.tools import ToolRegistry
 
 
@@ -94,7 +94,12 @@ class ResearchCampaignReport(BaseModel):
 
 
 class AutonomousResearchCampaign:
-    """Orchestrates iterative multi-round scientific investigations."""
+    """Orchestrates iterative multi-round scientific investigations.
+
+    Either a fully-configured ``agent`` or a ``provider`` must be supplied.
+    If only a ``provider`` is given, an agent is constructed from it together
+    with the optional ``tool_registry`` and ``observer_callback``.
+    """
 
     def __init__(
         self,
@@ -103,14 +108,23 @@ class AutonomousResearchCampaign:
         tool_registry: ToolRegistry | None = None,
         observer_callback: Callable[[str, Any], None] | None = None,
     ) -> None:
-        self.provider = provider or DeterministicScientistProvider()
+        if agent is None and provider is None:
+            raise ValueError(
+                "AutonomousResearchCampaign requires either 'agent' or 'provider' to be set."
+            )
         self.tool_registry = tool_registry or ToolRegistry()
         self.observer = observer_callback or (lambda _event, _payload: None)
-        self.agent = agent or ScientificAgent(
-            provider=self.provider,
-            tool_registry=self.tool_registry,
-            observer_callback=self.observer,
-        )
+        if agent is None:
+            if provider is None:
+                raise ValueError(
+                    "AutonomousResearchCampaign requires either 'agent' or 'provider' to be set."
+                )
+            agent = ScientificAgent(
+                provider=provider,
+                tool_registry=self.tool_registry,
+                observer_callback=self.observer,
+            )
+        self.agent = agent
 
     def execute_campaign(
         self,
